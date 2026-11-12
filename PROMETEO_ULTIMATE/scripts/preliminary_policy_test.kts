@@ -1,0 +1,11 @@
+import it.prometeo.core.*
+check(AccessPolicy.allows(Role.ZEUS, Permission.ACCESS_COSMO))
+check(AccessPolicy.allows(Role.ADMIN, Permission.ACCESS_COSMO, approvedByZeus = true))
+check(!AccessPolicy.allows(Role.ADMIN, Permission.ACCESS_COSMO, approvedByZeus = false))
+check(AccessPolicy.allows(Role.ADE, Permission.MANAGE_ADMINS))
+check(AccessPolicy.allows(Role.POSEIDONE, Permission.MANAGE_ADMINS))
+check(!AccessPolicy.allows(Role.ADE, Permission.MANAGE_DELEGATES))
+check(!AccessPolicy.allows(Role.POSEIDONE, Permission.MANAGE_DELEGATES))
+check(!AccessPolicy.canRemoveZeus(Role.ADE))
+check(AccessPolicy.canRevokeDelegate(Role.ZEUS))
+println("9/9 policy assertions passed")
