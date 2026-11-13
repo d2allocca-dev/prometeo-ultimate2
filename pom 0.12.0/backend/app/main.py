@@ -43,6 +43,7 @@ class SessionToken(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    mfa_pending: Mapped[bool] = mapped_column(Boolean, default=False)
 class Audit(Base):
     __tablename__ = "audit"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -94,18 +95,27 @@ class MemoryIn(BaseModel):
 def audit(s: Session, actor: str, action: str, target: str=""):
     s.add(Audit(actor=actor, action=action, target=target)); s.commit()
 
-def token_for(s: Session, u: User):
+def token_for(s: Session, u: User, mfa_pending: bool=False):
     sid=str(uuid.uuid4()); expires=datetime.now(timezone.utc)+timedelta(minutes=int(os.getenv("ACCESS_TOKEN_MINUTES","10")))
-    s.add(SessionToken(id=sid,user_id=u.id,expires_at=expires,revoked=False)); s.commit()
+    s.add(SessionToken(id=sid,user_id=u.id,expires_at=expires,revoked=False,mfa_pending=mfa_pending)); s.commit()
     return jwt.encode({"sub":u.id,"sid":sid,"exp":expires},JWT_SECRET,algorithm="HS256")
 
-def current_user(authorization: str=Header(default=""), s: Session=Depends(db)):
+def current_user(authorization: str=Header(default=""), s: Session=Depends(db), allow_mfa_pending: bool=False):
     if not authorization.startswith("Bearer "): raise HTTPException(401,"Bearer token required")
     try: data=jwt.decode(authorization[7:],JWT_SECRET,algorithms=["HS256"])
     except jwt.PyJWTError: raise HTTPException(401,"Invalid or expired session")
     sess=s.get(SessionToken,data.get("sid")); u=s.get(User,data.get("sub"))
     if not sess or sess.revoked or sess.expires_at.replace(tzinfo=timezone.utc)<datetime.now(timezone.utc) or not u or not u.active:
         raise HTTPException(401,"Session revoked or user inactive")
+    if sess.mfa_pending and not allow_mfa_pending: raise HTTPException(403,"MFA setup must be completed first")
+    return u
+
+def mfa_enrollment_user(authorization: str=Header(default=""), s: Session=Depends(db)):
+    if not authorization.startswith("Bearer "): raise HTTPException(401,"Bearer token required")
+    try: data=jwt.decode(authorization[7:],JWT_SECRET,algorithms=["HS256"])
+    except jwt.PyJWTError: raise HTTPException(401,"Invalid or expired session")
+    sess=s.get(SessionToken,data.get("sid")); u=s.get(User,data.get("sub"))
+    if not sess or sess.revoked or not sess.mfa_pending or not u or not u.active: raise HTTPException(403,"MFA enrollment session required")
     return u
 
 def role_required(*roles):
@@ -140,21 +150,23 @@ def login(x: LoginIn, s: Session=Depends(db)):
     try: hasher.verify(u.password_hash,x.password)
     except VerifyMismatchError: raise HTTPException(401,"Invalid credentials")
     if not u.approved: raise HTTPException(403,"Awaiting ZEUS approval")
-    if not u.totp_secret: raise HTTPException(403,"MFA enrollment required")
+    if not u.totp_secret:
+        return {"mfa_setup_required":True,"enrollment_token":token_for(s,u,mfa_pending=True),"expires_in":int(os.getenv("ACCESS_TOKEN_MINUTES","10"))*60}
     if not x.totp or not pyotp.TOTP(u.totp_secret).verify(x.totp,valid_window=1): raise HTTPException(401,"Invalid MFA code")
     audit(s,u.id,"LOGIN")
     return {"access_token":token_for(s,u),"token_type":"bearer","expires_in":int(os.getenv("ACCESS_TOKEN_MINUTES","10"))*60,"role":u.role}
 
 @app.post("/v1/mfa/setup")
-def mfa_setup(u: User=Depends(current_user),s: Session=Depends(db)):
+def mfa_setup(u: User=Depends(mfa_enrollment_user),s: Session=Depends(db)):
     if u.totp_secret: raise HTTPException(409,"MFA already configured")
     secret=pyotp.random_base32(); u.totp_secret=secret; s.commit()
     return {"secret":secret,"otpauth_uri":pyotp.TOTP(secret).provisioning_uri(name=u.username,issuer_name=os.getenv("TOTP_ISSUER","Prometeo COSMO")),"warning":"Store this secret securely and confirm with /v1/mfa/confirm."}
 
 @app.post("/v1/mfa/confirm")
-def mfa_confirm(x: TotpIn,u: User=Depends(current_user),s: Session=Depends(db)):
+def mfa_confirm(x: TotpIn,u: User=Depends(mfa_enrollment_user),authorization: str=Header(default=""),s: Session=Depends(db)):
     if not u.totp_secret or not pyotp.TOTP(u.totp_secret).verify(x.code,valid_window=1): raise HTTPException(400,"Invalid MFA code")
-    audit(s,u.id,"MFA_ENABLED"); return {"mfa_enabled":True}
+    data=jwt.decode(authorization[7:],JWT_SECRET,algorithms=["HS256"]); sess=s.get(SessionToken,data["sid"]); sess.mfa_pending=False; s.commit()
+    audit(s,u.id,"MFA_ENABLED"); return {"mfa_enabled":True,"message":"MFA enabled. Log in again with password and TOTP."}
 
 @app.post("/v1/logout")
 def logout(u: User=Depends(current_user),authorization: str=Header(default=""),s: Session=Depends(db)):
