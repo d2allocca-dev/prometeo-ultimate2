@@ -51,8 +51,6 @@ fun PrometeoApp(platformName: String, adaptiveSummary: String = "Profilo hardwar
     var cosmoOwnerEmail by remember { mutableStateOf(PlatformStore.get("cosmo.ownerEmail") ?: "promrtro_ai-cloud@gmail.com") }
     var cosmoCloudEndpoint by remember { mutableStateOf(PlatformStore.get("cosmo.cloudEndpoint") ?: "") }
     var cosmoEnrollmentEndpoint by remember { mutableStateOf(PlatformStore.get("cosmo.enrollmentEndpoint") ?: "") }
-    var djiEndpoint by remember { mutableStateOf(PlatformStore.get("integration.dji") ?: "") }
-    var dflightEndpoint by remember { mutableStateOf(PlatformStore.get("integration.dflight") ?: "") }
     var smartHomeEndpoint by remember { mutableStateOf(PlatformStore.get("integration.smarthome") ?: "") }
     val aiEndpointValid = isSecureAiEndpoint(aiEndpoint)
     var offlineMode by remember { mutableStateOf(PlatformStore.get("offline") != "false") }
@@ -69,8 +67,6 @@ fun PrometeoApp(platformName: String, adaptiveSummary: String = "Profilo hardwar
         PlatformStore.put("cosmo.ownerEmail", cosmoOwnerEmail.trim())
         PlatformStore.put("cosmo.cloudEndpoint", cosmoCloudEndpoint.trim())
         PlatformStore.put("cosmo.enrollmentEndpoint", cosmoEnrollmentEndpoint.trim())
-        PlatformStore.put("integration.dji", djiEndpoint.trim())
-        PlatformStore.put("integration.dflight", dflightEndpoint.trim())
         PlatformStore.put("integration.smarthome", smartHomeEndpoint.trim())
         PlatformStore.put("chat", pack(chat.map { (if (it.fromUser) "U" else "A") + "|" + it.text }))
         PlatformStore.put("efesto.language", efestoLanguage)
@@ -197,8 +193,7 @@ fun PrometeoApp(platformName: String, adaptiveSummary: String = "Profilo hardwar
                             ) else { page = Page.HOME }
                             Page.COSMO_CONFIG -> if (privateUnlocked) CosmoConfigPage(
                                 cosmoOwnerEmail, { cosmoOwnerEmail = it }, cosmoCloudEndpoint, { cosmoCloudEndpoint = it },
-                                cosmoEnrollmentEndpoint, { cosmoEnrollmentEndpoint = it }, djiEndpoint, { djiEndpoint = it },
-                                dflightEndpoint, { dflightEndpoint = it }, smartHomeEndpoint, { smartHomeEndpoint = it },
+                                cosmoEnrollmentEndpoint, { cosmoEnrollmentEndpoint = it }, smartHomeEndpoint, { smartHomeEndpoint = it },
                                 onBack = { page = Page.COSMO }
                             ) else { page = Page.HOME }
                             Page.EFESTO -> if (privateUnlocked) EfestoPage(assistantName, { assistantName = it }, efestoLanguage, { efestoLanguage = it }, efestoVoice, { efestoVoice = it }, efestoOffline, { efestoOffline = it }, onOracle = { page = Page.ORACLE }, onLock = { privateUnlocked = false; page = Page.HOME }) else { page = Page.HOME }
@@ -329,8 +324,6 @@ fun PrometeoApp(platformName: String, adaptiveSummary: String = "Profilo hardwar
     ownerEmail: String, setOwnerEmail: (String) -> Unit,
     cloud: String, setCloud: (String) -> Unit,
     enrollment: String, setEnrollment: (String) -> Unit,
-    dji: String, setDji: (String) -> Unit,
-    dflight: String, setDflight: (String) -> Unit,
     smartHome: String, setSmartHome: (String) -> Unit,
     onBack: () -> Unit
 ) {
@@ -342,8 +335,6 @@ fun PrometeoApp(platformName: String, adaptiveSummary: String = "Profilo hardwar
         OutlinedTextField(enrollment, setEnrollment, modifier = Modifier.fillMaxWidth(), label = { Text("Endpoint registrazione unità HTTPS") })
         Divider()
         Text("Integrazioni esterne", style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(dji, setDji, modifier = Modifier.fillMaxWidth(), label = { Text("Endpoint servizio DJI / flotta") })
-        OutlinedTextField(dflight, setDflight, modifier = Modifier.fillMaxWidth(), label = { Text("Endpoint D-Flight / pianificazione") })
         OutlinedTextField(smartHome, setSmartHome, modifier = Modifier.fillMaxWidth(), label = { Text("Endpoint domotica (eWeLink / Home / Alexa)") })
         ElevatedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Credenziali e sicurezza", style = MaterialTheme.typography.titleMedium)
@@ -388,7 +379,7 @@ fun PrometeoApp(platformName: String, adaptiveSummary: String = "Profilo hardwar
 @Composable private fun ModulesPage() {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Moduli", style = MaterialTheme.typography.titleLarge)
-        listOf("Domotica" to "Le integrazioni con servizi e dispositivi richiedono account e autorizzazioni dei rispettivi fornitori.", "Droni" to "La pianificazione richiede dati aeronautici ufficiali e verifiche normative aggiornate.", "Dispositivi" to "Le autorizzazioni Android saranno richieste solo quando una funzione ne avrà bisogno.", "Modalità offline" to "Le funzioni locali restano disponibili senza rete; l'AI generativa remota richiede connessione.").forEach { (title, desc) -> ElevatedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(desc) } } }
+        listOf("Domotica" to "Le integrazioni con servizi e dispositivi richiedono account e autorizzazioni dei rispettivi fornitori.", "Dispositivi" to "Le autorizzazioni Android saranno richieste solo quando una funzione ne avrà bisogno.", "Modalità offline" to "Le funzioni locali restano disponibili senza rete; l'AI generativa richiede un modello locale installato o un servizio remoto.").forEach { (title, desc) -> ElevatedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(desc) } } }
     }
 }
 
