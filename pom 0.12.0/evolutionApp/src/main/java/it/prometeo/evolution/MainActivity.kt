@@ -2,8 +2,11 @@ package it.prometeo.evolution
 
 import android.content.Intent
 import android.os.Bundle
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +26,28 @@ class MainActivity : ComponentActivity() {
             var syncEnabled by remember { mutableStateOf(prefs.getBoolean("syncEnabled", false)) }
             var offline by remember { mutableStateOf(prefs.getBoolean("offline", true)) }
             var status by remember { mutableStateOf("Configurazione locale · nessun server collegato") }
+            val importConfig = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+                if (uri != null) {
+                    runCatching {
+                        val json = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                            ?: error("File non leggibile")
+                        val config = JSONObject(json)
+                        require(config.optString("format") == "prometeo-evolution-config-v1") { "Formato configurazione non riconosciuto" }
+                        val importedName = config.optString("assistantName", "Prometeo").take(32).ifBlank { "Prometeo" }
+                        val importedEndpoint = config.optString("configEndpoint", "")
+                        require(importedEndpoint.isBlank() || importedEndpoint.startsWith("https://", ignoreCase = true)) { "L'endpoint deve usare HTTPS" }
+                        val importedOffline = config.optBoolean("offlinePreferred", true)
+                        val importedSync = config.optBoolean("syncEnabled", false)
+                        prefs.edit().putString("displayName", importedName).putString("configUrl", importedEndpoint)
+                            .putBoolean("offline", importedOffline).putBoolean("syncEnabled", importedSync).apply()
+                        displayName = importedName
+                        configUrl = importedEndpoint
+                        offline = importedOffline
+                        syncEnabled = importedSync
+                        status = "Configurazione importata e salvata sul dispositivo"
+                    }.onFailure { status = "Importazione non riuscita: ${it.message ?: "file non valido"}" }
+                }
+            }
             val colors = darkColorScheme(primary = androidx.compose.ui.graphics.Color(0xFF29C7FF), background = androidx.compose.ui.graphics.Color(0xFF020B18), surface = androidx.compose.ui.graphics.Color(0xFF07182B))
             MaterialTheme(colorScheme = colors) {
                 Scaffold { insets ->
@@ -45,6 +70,9 @@ class MainActivity : ComponentActivity() {
                                 .putBoolean("syncEnabled", syncEnabled).apply()
                             status = "Preferenze salvate su questo dispositivo"
                         }, Modifier.fillMaxWidth()) { Text("Salva configurazione") }
+                        OutlinedButton(onClick = { importConfig.launch(arrayOf("application/json", "text/*")) }, Modifier.fillMaxWidth()) {
+                            Text("Importa configurazione da COSMO")
+                        }
                         OutlinedButton(onClick = {
                             val json = JSONObject().put("format", "prometeo-evolution-config-v1")
                                 .put("assistantName", displayName.trim().ifBlank { "Prometeo" })
