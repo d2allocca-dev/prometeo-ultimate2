@@ -25,3 +25,6 @@ jobs:
           cache-dependency-path: "pom 0.12.0/backend/requirements-dev.txt"
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
+        env:
+          JWT_SECRET: test-only-secret-that-is-at-least-32-characters-long
+          ZEUS_BOOTSTRAP_TOKEN: test-only-bootstrap-token
