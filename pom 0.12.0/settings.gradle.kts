@@ -6,4 +6,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "PROMETEO_ULTIMATE"
-include(":shared", ":androidApp", ":desktopApp")
+include(":shared", ":androidApp", ":desktopApp", ":evolutionApp")

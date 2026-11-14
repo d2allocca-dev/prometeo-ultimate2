@@ -1,36 +1,73 @@
-name: Build debug APK
-
+name: Build Android APKs
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main", "upload-0.12.0-adaptive"]
+    paths:
+      - "pom 0.12.0/**"
+      - ".github/workflows/android.yml"
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
-
-      - name: Build debug APK
+          gradle-version: "8.9"
+      - name: Build Prometeo and Evolution
         working-directory: "pom 0.12.0"
-        run: gradle assembleDebug
-
-      - name: Upload APK
+        run: gradle :androidApp:assembleDebug :evolutionApp:assembleDebug
+      - name: Create complete delivery package
+        run: |
+          mkdir -p release/Prometeo_Ultimate
+          git archive HEAD | tar -x -C release/Prometeo_Ultimate
+          mkdir -p release/Prometeo_Ultimate/APK
+          cp "pom 0.12.0/androidApp/build/outputs/apk/debug/androidApp-debug.apk" release/Prometeo_Ultimate/APK/Prometeo-Ultimate-debug.apk
+          cp "pom 0.12.0/evolutionApp/build/outputs/apk/debug/evolutionApp-debug.apk" release/Prometeo_Ultimate/APK/Prometeo-Evolution-debug.apk
+          cat > release/Prometeo_Ultimate/LEGGIMI.txt <<'EOF'
+          PROMETEO ULTIMATE - PACCHETTO COMPLETO
+          
+          Contenuto:
+          - Codice sorgente completo del repository al commit compilato.
+          - APK debug di Prometeo Ultimate.
+          - APK debug di Prometeo Evolution.
+          - Backend COSMO e configurazione di esempio.
+          
+          Compilazione:
+          Aprire la cartella "pom 0.12.0" con Android Studio oppure usare Gradle 8.9 e JDK 17.
+          Moduli Android: :androidApp e :evolutionApp.
+          
+          Sicurezza:
+          Gli APK sono build debug e non sono firmati per distribuzione Play Store.
+          Il backend COSMO è sorgente pronto per configurazione e deployment, non è già pubblicato online.
+          Prima di esporlo su Internet configurare segreti unici, HTTPS, rate limiting e verifiche di sicurezza.
+          Non inserire chiavi API o password nel repository o negli APK.
+          
+          Nota:
+          Questo pacchetto corrisponde al branch upload-0.12.0-adaptive del repository.
+          Non sostituisce il progetto sorgente dell'APK esterno analizzato in precedenza, che risultava differente.
+          EOF
+          cd release
+          zip -qr ../Prometeo_Ultimate_Pacchetto_Completo.zip Prometeo_Ultimate
+      - name: Upload complete package
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: "pom 0.12.0/**/build/outputs/apk/debug/*.apk"
-
+          name: prometeo-complete-package
+          path: Prometeo_Ultimate_Pacchetto_Completo.zip
+          if-no-files-found: error
+      - name: Upload Prometeo APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: prometeo-ultimate-debug
+          path: "pom 0.12.0/androidApp/build/outputs/apk/debug/androidApp-debug.apk"
+          if-no-files-found: error
+      - name: Upload Evolution APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: prometeo-evolution-debug
+          path: "pom 0.12.0/evolutionApp/build/outputs/apk/debug/evolutionApp-debug.apk"
+          if-no-files-found: error

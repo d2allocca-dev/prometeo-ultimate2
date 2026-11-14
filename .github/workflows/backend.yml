@@ -1,0 +1,30 @@
+name: COSMO backend checks
+on:
+  push:
+    branches: ["main", "upload-0.12.0-adaptive"]
+    paths:
+      - "pom 0.12.0/backend/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "pom 0.12.0/backend/**"
+      - ".github/workflows/backend.yml"
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: "pom 0.12.0/backend"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: "pom 0.12.0/backend/requirements-dev.txt"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+        env:
+          JWT_SECRET: test-only-secret-that-is-at-least-32-characters-long
+          ZEUS_BOOTSTRAP_TOKEN: test-only-bootstrap-token

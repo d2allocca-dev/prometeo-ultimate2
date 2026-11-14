@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
@@ -5,7 +7,11 @@ plugins {
     kotlin("plugin.compose")
 }
 kotlin {
-    androidTarget()
+    androidTarget {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
     jvm("desktop")
     sourceSets {
         commonMain.dependencies {
@@ -23,4 +29,8 @@ android {
     namespace = "it.prometeo.core"
     compileSdk = 35
     defaultConfig { minSdk = 26 }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
 }
